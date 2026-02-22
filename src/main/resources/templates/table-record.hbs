@@ -1,0 +1,30 @@
+package {{packageName}};
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Table;
+import org.springframework.data.relational.core.mapping.Column;
+{{#each imports~}}
+    import {{this}};
+{{/each}}
+
+{{#if hasCustomTableMapping~}}
+    @Table("{{dbTableName}}")
+{{/if~}}
+public record {{className}}(
+{{~#if pkColumns}}
+    {{#if hasCompositePk}}@Id {{className}}Id id{{else~}}
+    {{#each pkColumns}}@Id {{#if hasCustomMapping}}@Column("{{dbName}}") {{/if}}{{type}} {{javaName}}{{/each}}{{/if~}}
+    {{#if columns}},{{/if}}
+{{~/if}}
+{{~#each columns}}
+    {{#if hasCustomMapping}}@Column("{{dbName}}") {{/if}}{{type}} {{javaName}}{{#unless @last}},{{/unless~}}
+{{/each}}
+) {
+{{~#if hasCompositePk}}
+    public record {{className}}Id(
+    {{~#each pkColumns}}
+        {{#if hasCustomMapping}}@Column("{{dbName}}") {{/if}}{{type}} {{javaName}}{{#unless @last}},{{/unless~}}
+    {{/each~}}
+    ) {}
+{{/if~}}
+}
