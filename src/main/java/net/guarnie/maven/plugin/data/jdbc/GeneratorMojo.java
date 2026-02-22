@@ -26,7 +26,7 @@ import java.sql.*;
 import java.util.*;
 
 /**
- * Plugin maven per generare records per Spring Data JDBC.
+ * Maven plugin for generating records for Spring Data JDBC.
  */
 @Mojo(name = "generate-records", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 @SuppressWarnings("unused")
@@ -42,30 +42,67 @@ public class GeneratorMojo extends AbstractMojo {
     private static final String JDBC_PASS = "jdbc.pass";
     private static final String JDBC_SCHEMA = "jdbc.schema";
 
-
+    /**
+     * Path to the .env file containing database connection properties.
+     */
     @Parameter(defaultValue = "${project.basedir}/.env")
     private Path envPath;
 
+    /**
+     * Path to the YAML file containing custom table and column mappings.
+     */
     @Parameter
     private Path mappingsPath;
 
+    /**
+     * The package name for the generated Java records.
+     */
     @Parameter(required = true)
     private String packageName;
 
+    /**
+     * The output directory for the generated Java source files.
+     */
     @Parameter(defaultValue = "${project.build.directory}/generated-sources/jdbc-records")
     private Path outputPath;
 
+    /**
+     * Whether to use OffsetDateTime instead of Instant for timestamp with timezone fields.
+     */
     @Parameter(defaultValue = "false")
     private boolean useOffsetDateTime;
 
+    /**
+     * Path to a directory containing custom Handlebars templates.
+     */
     @Parameter
     private Path templatesPath;
 
+    /**
+     * Loaded generator mappings configuration.
+     */
     private GeneratorMappings mappings;
+
+    /**
+     * The Handlebars template used for record generation.
+     */
     private Template template;
+
+    /**
+     * The fully qualified name of the Java class to use for timestamp with timezone fields.
+     */
     private String timestampTzClassName;
 
+    /**
+     * Default constructor
+     */
+    public GeneratorMojo() {
+    }
 
+    /**
+     * Entry point for the Mojo execution.
+     * @throws MojoExecutionException If generation fails.
+     */
     @Override
     public void execute() throws MojoExecutionException {
         log.info("Starting Spring Data JDBC Record Generation");
@@ -92,12 +129,12 @@ public class GeneratorMojo extends AbstractMojo {
     }
 
     /**
-     * Genera un file java che rappresenta una classe java record che mappa
-     * una tabella di un certo schema appartenente a un database.
-     * @param meta Metadata db
-     * @param tableName Nome tabella
-     * @param schema Schema dn
-     * @throws Exception Eccezione durante l'accesso al db
+     * Generates a Java source file representing a Java record class that maps
+     * a database table from a specific schema.
+     * @param meta Database metadata
+     * @param tableName Table name
+     * @param schema Database schema
+     * @throws Exception If database access fails or file writing fails.
      */
     private void generateRecordFile(DatabaseMetaData meta, String tableName, String schema) throws Exception {
         String javaClassName = mappings.getMappedTableName(tableName);
@@ -138,7 +175,7 @@ public class GeneratorMojo extends AbstractMojo {
             }
         }
 
-        // Preparo context per template Handlebars
+        // Prepare context for Handlebars template
         Map<String, Object> context = Map.of(
                 "packageName", packageName,
                 "className", javaClassName,
@@ -156,12 +193,12 @@ public class GeneratorMojo extends AbstractMojo {
     }
 
     /**
-     * Ritorna il tipo java che mappa il campo su Database
-     * @param type Codice tipo JDBC
-     * @param typeName Tipo nome campo
-     * @param precision Precisione del campo
-     * @param scale Scala
-     * @return Tipo java
+     * Returns the Java type that maps the database field.
+     * @param type JDBC type code
+     * @param typeName Field type name
+     * @param precision Field precision
+     * @param scale Field scale
+     * @return Fully qualified Java class name as a String
      */
     private String mapSqlType(int type, String typeName, int precision, int scale) {
         String name = (typeName == null) ? "" : typeName.toLowerCase();
@@ -170,21 +207,21 @@ public class GeneratorMojo extends AbstractMojo {
             case Types.INTEGER, Types.SMALLINT, Types.TINYINT -> "java.lang.Integer";
             case Types.BIGINT -> "java.lang.Long";
 
-            case Types.DECIMAL, Types.NUMERIC -> (scale <= 0)?  // Se la scala è 0 o -127 (Oracle), è un numero intero
+            case Types.DECIMAL, Types.NUMERIC -> (scale <= 0)?  // If scale is 0 or -127 (Oracle), it's an integer
                     ((precision > 0 && precision < 10)? "java.lang.Integer" : "java.lang.Long") : "java.math.BigDecimal";
 
             case Types.FLOAT, Types.REAL, Types.DOUBLE -> "java.lang.Double";
             case Types.VARCHAR, Types.CHAR, Types.LONGVARCHAR, Types.CLOB, Types.NVARCHAR, Types.NCHAR -> "java.lang.String";
             case Types.BOOLEAN, Types.BIT -> "java.lang.Boolean";
 
-            // DATE E TEMPO: Supporto SQL Server (-155) e Postgres
+            // DATE AND TIME: SQL Server (-155) and Postgres support
             case -155, Types.TIMESTAMP_WITH_TIMEZONE -> timestampTzClassName;
             case Types.TIMESTAMP -> name.contains("tz") || name.contains("offset")? timestampTzClassName : "java.time.LocalDateTime";
             case Types.DATE -> "java.time.LocalDate";
             case Types.TIME -> "java.time.LocalTime";
             case Types.BINARY, Types.VARBINARY, Types.LONGVARBINARY, Types.BLOB -> "byte[]";
 
-            // TIPI SPECIALI (Postgres "OTHER", Oracle "RAW", ecc.)
+            // SPECIAL TYPES (Postgres "OTHER", Oracle "RAW", etc.)
             case Types.OTHER, Types.ROWID -> switch (name) {
                 case "jsonb", "json" -> "com.fasterxml.jackson.databind.JsonNode";
                 case "uuid" -> "java.util.UUID";
@@ -200,6 +237,12 @@ public class GeneratorMojo extends AbstractMojo {
         };
     }
 
+    /**
+     * Loads the generator mappings from a YAML file.
+     * @param path Path to the mappings file.
+     * @return GeneratorMappings instance.
+     * @throws MojoExecutionException If the file doesn't exist or parsing fails.
+     */
     private GeneratorMappings loadMappings(Path path) throws MojoExecutionException {
         if (path == null) {
             log.info("No mappings file specified. Falling back to default values.");
@@ -217,6 +260,12 @@ public class GeneratorMojo extends AbstractMojo {
         }
     }
 
+    /**
+     * Loads the Handlebars template.
+     * @param path Optional path to a folder containing custom templates.
+     * @return Compiled Handlebars Template.
+     * @throws MojoExecutionException If the template cannot be loaded or compiled.
+     */
     private Template loadTemplate(Path path) throws MojoExecutionException {
         TemplateLoader loader;
         if (path != null) {
@@ -237,6 +286,12 @@ public class GeneratorMojo extends AbstractMojo {
         }
     }
 
+    /**
+     * Loads database configuration properties from a file.
+     * @param path Path to the .env or properties file.
+     * @return Loaded Properties.
+     * @throws MojoExecutionException If the file cannot be read.
+     */
     private Properties loadEnv(Path path) throws MojoExecutionException {
         Properties props = new Properties();
         try (InputStream is = Files.newInputStream(path)) {
