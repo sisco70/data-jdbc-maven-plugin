@@ -3,10 +3,10 @@ package net.guarnie.maven.plugin.data.jdbc;
 
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.Template;
-import com.github.jknack.handlebars.internal.lang3.tuple.Pair;
 import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 import com.github.jknack.handlebars.io.FileTemplateLoader;
 import com.github.jknack.handlebars.io.TemplateLoader;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -29,6 +29,7 @@ import java.util.*;
  * Plugin maven per generare records per Spring Data JDBC.
  */
 @Mojo(name = "generate-records", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
+@SuppressWarnings("unused")
 public class GeneratorMojo extends AbstractMojo {
     private static final Logger log = LoggerFactory.getLogger(GeneratorMojo.class);
 

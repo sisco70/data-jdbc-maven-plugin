@@ -2,8 +2,8 @@ package net.guarnie.maven.plugin.data.jdbc;
 
 
 
-import com.github.jknack.handlebars.internal.lang3.tuple.Pair;
 
+import org.apache.commons.lang3.tuple.Pair;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 /**
  *
  */
+@SuppressWarnings("unused")
 public class GeneratorMappings {
     private FiltersConfig filters = new FiltersConfig();
     private MappingsConfig mappings = new MappingsConfig();
