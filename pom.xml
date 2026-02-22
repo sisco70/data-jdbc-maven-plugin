@@ -183,5 +183,4 @@
         <developerConnection>scm:git:ssh://github.com:sisco70/data-jdbc-maven-plugin.git</developerConnection>
         <url>https://github.com/sisco70/data-jdbc-maven-plugin/tree/main</url>
     </scm>
-
 </project>
