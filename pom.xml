@@ -107,6 +107,16 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.10.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>maven-central</publishingServerId>
+                            <tokenAuth>true</tokenAuth>
+                        </configuration>
+                    </plugin>
                 </plugins>
             </build>
         </profile>
@@ -151,13 +161,6 @@
             </plugin>
         </plugins>
     </build>
-
-    <distributionManagement>
-        <repository>
-            <id>maven-central</id>
-            <url>https://central.sonatype.com/api/v1/publisher</url>
-        </repository>
-    </distributionManagement>
 
     <licenses>
         <license>
