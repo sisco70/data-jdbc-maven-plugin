@@ -79,3 +79,8 @@ mappings:
 Both include and exclude are lists and support **regular expressions**.
 - If `include` is not provided, all tables in the schema will be included by default.
 - If `exclude` is not provided, no tables will be excluded.
+
+
+
+---
+Licensed under the Apache License, Version 2.0

@@ -5,7 +5,7 @@
 
     <groupId>net.guarnie</groupId>
     <artifactId>data-jdbc-maven-plugin</artifactId>
-    <version>0.0.3</version>
+    <version>0.0.4</version>
     <packaging>maven-plugin</packaging>
 
     <name>${project.artifactId}</name>
@@ -114,7 +114,7 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>maven-central</publishingServerId>
-                            <tokenAuth>true</tokenAuth>
+                            <!--<tokenAuth>true</tokenAuth>-->
                         </configuration>
                     </plugin>
                 </plugins>
@@ -164,8 +164,8 @@
 
     <licenses>
         <license>
-            <name>MIT License</name>
-            <url>https://opensource.org/licenses/MIT</url>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
             <distribution>repo</distribution>
         </license>
     </licenses>
