@@ -1,5 +1,12 @@
 # data-jdbc-maven-plugin
 
+
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Maven Central](https://img.shields.io/maven-central/v/net.guarnie/data-jdbc-maven-plugin.svg)](https://search.maven.org/artifact/TUO_GROUP_ID/TUO_ARTIFACT_ID)
+![Java](https://img.shields.io/badge/Java-17%2B-orange?logo=openjdk&logoColor=white)
+
+---
+
 A Maven plugin designed to generate Java Records for use with Spring Data JDBC, reverse-engineered directly from a database schema.
 
 #### Example of usage within a pom.xml using default parameters
@@ -13,7 +20,7 @@ A Maven plugin designed to generate Java Records for use with Spring Data JDBC, 
 <plugin>
     <groupId>net.guarnie</groupId>
     <artifactId>data-jdbc-maven-plugin</artifactId>
-    <version>0.0.3</version>
+    <version>0.0.4</version>
     <executions>
         <execution>
             <goals>
@@ -44,12 +51,21 @@ The following customizations can be added inside the `configuration` block:
 ```xml
 <mappingsPath>${project.basedir}/config/mappings.yml</mappingsPath>
 ```
-- Custom templates directory path (to provide a custom version of `table-record.hbs`):
+- Custom templates directory path (to provide a custom version of **table-record.hbs**):
 ```xml
 <templatesPath>${project.basedir}/config/templates</templatesPath>
 ```
+- Custom output directory path (default: **${project.build.directory}/generated-sources/jdbc-records**):
+```xml
+<outputPath>${project.basedir}/out/records</outputPath>
+```
+- To map TIMESTAMP fields with TIMEZONE use OffsetDateTime instead of Instant (default):
+```xml
+<useOffsetDateTime>true</useOffsetDateTime>
+```
 
 #### Custom File Examples
+
 
 Example .env file for database access:
 ```properties
@@ -80,7 +96,3 @@ Both include and exclude are lists and support **regular expressions**.
 - If `include` is not provided, all tables in the schema will be included by default.
 - If `exclude` is not provided, no tables will be excluded.
 
-
-
----
-Licensed under the Apache License, Version 2.0
