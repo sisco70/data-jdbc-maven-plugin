@@ -1,10 +1,16 @@
 package {{packageName}};
 
+{{#if pkColumns~}}
 import org.springframework.data.annotation.Id;
+{{/if~}}
+{{#if hasCustomTableMapping~}}
 import org.springframework.data.relational.core.mapping.Table;
+{{/if~}}
+{{#if hasCustomFieldMappings~}}
 import org.springframework.data.relational.core.mapping.Column;
+{{/if~}}
 {{#each imports~}}
-    import {{this}};
+import {{this}};
 {{/each}}
 
 {{#if hasCustomTableMapping~}}

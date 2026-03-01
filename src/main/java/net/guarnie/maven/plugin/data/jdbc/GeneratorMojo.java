@@ -35,6 +35,8 @@ public class GeneratorMojo extends AbstractMojo {
 
     private static final String OFFSETDATETIME_CLASS = "java.time.OffsetDateTime";
     private static final String INSTANT_CLASS = "java.time.Instant";
+
+    private static final String CORE_PACKAGE_PREFIX = "java.lang.";
     private static final String HBS_EXTENSION = ".hbs";
     private static final String TPL_TABLE_RECORD = "table-record";
     private static final String JDBC_URL = "jdbc.url";
@@ -144,6 +146,7 @@ public class GeneratorMojo extends AbstractMojo {
         List<Map<String, Object>> pkCols = new ArrayList<>();
         Set<String> imports = new TreeSet<>();
         Set<String> pkNames = new HashSet<>();
+        boolean hasCustomFieldMappings = false;
 
         try (ResultSet rs = meta.getPrimaryKeys(null, schema, tableName)) {
             while (rs.next()) pkNames.add(rs.getString("COLUMN_NAME").toLowerCase());
@@ -158,9 +161,9 @@ public class GeneratorMojo extends AbstractMojo {
                 int scale = rs.getInt("DECIMAL_DIGITS");
                 String fullType = mapSqlType(dataType, typeName, precision, scale);
                 int dotPos = fullType.lastIndexOf(".");
-                if (dotPos > -1 && !fullType.startsWith("java.lang.")) imports.add(fullType);
+                if (dotPos > -1 && !fullType.startsWith(CORE_PACKAGE_PREFIX)) imports.add(fullType);
 
-                Pair<String,Boolean> javaCol = mappings.getMappedColumnName(tableName, dbColName);
+                Pair<String, Boolean> javaCol = mappings.getMappedColumnName(tableName, dbColName);
                 String simpleType = fullType.substring(dotPos + 1);
 
                 Map<String, Object> col = Map.of(
@@ -169,6 +172,8 @@ public class GeneratorMojo extends AbstractMojo {
                         "type", simpleType,
                         "hasCustomMapping", javaCol.getRight()
                 );
+
+                if (!hasCustomFieldMappings && javaCol.getRight()) hasCustomFieldMappings = true;
 
                 if (pkNames.contains(dbColName.toLowerCase())) pkCols.add(col);
                 else cols.add(col);
@@ -181,6 +186,7 @@ public class GeneratorMojo extends AbstractMojo {
                 "className", javaClassName,
                 "dbTableName", tableName,
                 "hasCustomTableMapping", !tableName.equalsIgnoreCase(javaClassName),
+                "hasCustomFieldMappings",  hasCustomFieldMappings,
                 "pkColumns", pkCols,
                 "columns", cols,
                 "hasCompositePk", pkCols.size() > 1,
