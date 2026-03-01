@@ -13,6 +13,8 @@
     <url>https://github.com/sisco70/data-jdbc-maven-plugin</url>
 
     <properties>
+        <project.lead.name>Francesco Guarnieri</project.lead.name>
+        <project.lead.email>sisco70@users.noreply.github.com</project.lead.email>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <handlebars.version>4.5.0</handlebars.version>
@@ -20,6 +22,22 @@
         <maven.plugin.api.version>3.9.12</maven.plugin.api.version>
         <maven.plugin.annotations.version>3.12.0</maven.plugin.annotations.version>
     </properties>
+
+    <developers>
+        <developer>
+            <name>${project.lead.name}</name>
+            <email>${project.lead.email}</email>
+            <organization>guarnie.net</organization>
+        </developer>
+    </developers>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
 
     <dependencies>
         <dependency>
@@ -159,24 +177,36 @@
                     </compilerArgs>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>5.0.0</version>
+                <configuration>
+                    <properties>
+                        <owner>${project.lead.name}</owner>
+                        <year>2026</year>
+                    </properties>
+                    <licenseSets>
+                        <licenseSet>
+                            <header>com/mycila/maven/plugin/license/templates/APACHE-2-noemail.txt</header>
+                            <includes>
+                                <include>src/main/java/**/*.java</include>
+                            </includes>
+                        </licenseSet>
+                    </licenseSets>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>check-headers</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
-
-    <licenses>
-        <license>
-            <name>Apache License, Version 2.0</name>
-            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
-            <distribution>repo</distribution>
-        </license>
-    </licenses>
-
-    <developers>
-        <developer>
-            <name>Francesco Guarnieri</name>
-            <email>sisco70@users.noreply.github.com</email>
-            <organization>guarnie.net</organization>
-        </developer>
-    </developers>
 
     <scm>
         <connection>scm:git:git://github.com/sisco70/data-jdbc-maven-plugin.git</connection>
