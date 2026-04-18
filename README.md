@@ -20,7 +20,7 @@ A Maven plugin designed to generate Java Records for use with Spring Data JDBC, 
 <plugin>
     <groupId>net.guarnie</groupId>
     <artifactId>data-jdbc-maven-plugin</artifactId>
-    <version>0.0.4</version>
+    <version>0.0.5</version>
     <executions>
         <execution>
             <goals>
@@ -63,7 +63,14 @@ The following customizations can be added inside the `configuration` block:
 ```xml
 <useOffsetDateTime>true</useOffsetDateTime>
 ```
-
+- Include swagger annotations that use field and table descriptions (default):
+```xml
+<useSwagger>true</useSwagger>
+```
+- Includes Jakarta Validation annotations that refer to fields and tables (default):
+```xml
+<useJakartaValidation>true</useJakartaValidation>
+```
 #### Custom File Examples
 
 

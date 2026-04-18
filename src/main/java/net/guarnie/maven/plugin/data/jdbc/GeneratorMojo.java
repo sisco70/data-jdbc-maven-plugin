@@ -41,6 +41,10 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Map.entry;
 
 /**
  * Maven plugin for generating records for Spring Data JDBC.
@@ -53,6 +57,9 @@ public class GeneratorMojo extends AbstractMojo {
     private static final DateTimeFormatter DATE_TIME_ISO_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String OFFSETDATETIME_CLASS = "java.time.OffsetDateTime";
     private static final String INSTANT_CLASS = "java.time.Instant";
+
+    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
+    private static final Pattern PROTOCOL_PATTERN = Pattern.compile("jdbc:([^:]+):");
 
     private static final String CORE_PACKAGE_PREFIX = "java.lang.";
     private static final String HBS_EXTENSION = ".hbs";
@@ -93,10 +100,23 @@ public class GeneratorMojo extends AbstractMojo {
     private boolean useOffsetDateTime;
 
     /**
+     * Include swagger annotations that use field and table descriptions.
+     */
+    @Parameter(defaultValue = "true")
+    private boolean useSwagger;
+
+    /**
+     * Includes Jakarta Validation annotations that refer to fields and tables.
+     */
+    @Parameter(defaultValue = "true")
+    private boolean useJakartaValidation;
+
+    /**
      * Path to a directory containing custom Handlebars templates.
      */
     @Parameter
     private Path templatesPath;
+
 
     /**
      * Loaded generator mappings configuration.
@@ -132,14 +152,34 @@ public class GeneratorMojo extends AbstractMojo {
         Properties dbEnv = loadEnv(envPath);
         this.template = loadTemplate(templatesPath);
 
-        try (Connection conn = DriverManager.getConnection(dbEnv.getProperty(JDBC_URL), dbEnv.getProperty(JDBC_USER), dbEnv.getProperty(JDBC_PASS))) {
-            DatabaseMetaData meta = conn.getMetaData();
-            String schema = dbEnv.getProperty(JDBC_SCHEMA);
+        Properties connProps = new Properties();
+        connProps.setProperty("user", dbEnv.getProperty(JDBC_USER));
+        connProps.setProperty("password", dbEnv.getProperty(JDBC_PASS));
 
-            try (ResultSet rsTables = meta.getTables(null, schema, "%", new String[]{"TABLE"})) {
+        String catalog = null;
+        String schemaPattern = dbEnv.getProperty(JDBC_SCHEMA);
+        String dbUrl = dbEnv.getProperty(JDBC_URL);
+
+        Matcher matcher = PROTOCOL_PATTERN.matcher(dbUrl);
+        String protocol = matcher.find()? matcher.group(1).toLowerCase() : "generic";
+
+        switch (protocol) {
+            case "oracle" -> connProps.setProperty("remarksReporting", "true");
+            case "mysql", "mariadb" -> {
+                catalog = schemaPattern;
+                schemaPattern = null;
+                connProps.setProperty("useInformationSchema", "true");
+            }
+        }
+
+        try (Connection conn = DriverManager.getConnection(dbUrl, connProps)) {
+            DatabaseMetaData meta = conn.getMetaData();
+
+            try (ResultSet rsTables = meta.getTables(catalog, schemaPattern, "%", new String[]{"TABLE"})) {
                 while (rsTables.next()) {
                     String tableName = rsTables.getString("TABLE_NAME");
-                    if (mappings.shouldProcessTable(tableName)) generateRecordFile(meta, tableName, schema);
+                    String tableComment = cleanDBRemark(rsTables.getString("REMARKS"));
+                    if (mappings.shouldProcessTable(tableName)) generateRecordFile(meta, tableName, tableComment, catalog, schemaPattern);
                 }
             }
         } catch (Exception e) {
@@ -153,10 +193,11 @@ public class GeneratorMojo extends AbstractMojo {
      * a database table from a specific schema.
      * @param meta Database metadata
      * @param tableName Table name
+     * @param tableComment Table comment
      * @param schema Database schema
      * @throws Exception If database access fails or file writing fails.
      */
-    private void generateRecordFile(DatabaseMetaData meta, String tableName, String schema) throws Exception {
+    private void generateRecordFile(DatabaseMetaData meta, String tableName, String tableComment, String catalog, String schema) throws Exception {
         String javaClassName = mappings.getMappedTableName(tableName);
         log.info("Generating: {} -> {}", tableName, javaClassName);
 
@@ -165,18 +206,25 @@ public class GeneratorMojo extends AbstractMojo {
         Set<String> imports = new TreeSet<>();
         Set<String> pkNames = new HashSet<>();
         boolean hasCustomFieldMappings = false;
+        boolean validationsAvailable = false;
+        boolean remarksAvailable = !tableComment.isEmpty();
 
-        try (ResultSet rs = meta.getPrimaryKeys(null, schema, tableName)) {
-            while (rs.next()) pkNames.add(rs.getString("COLUMN_NAME").toLowerCase());
+        try (ResultSet rs = meta.getPrimaryKeys(catalog, schema, tableName)) {
+            while (rs.next()) {
+                pkNames.add(rs.getString("COLUMN_NAME").toLowerCase());
+            }
         }
 
-        try (ResultSet rs = meta.getColumns(null, schema, tableName, null)) {
+        try (ResultSet rs = meta.getColumns(catalog, schema, tableName, null)) {
             while (rs.next()) {
                 String dbColName = rs.getString("COLUMN_NAME");
+                String dbColComment = cleanDBRemark(rs.getString("REMARKS"));
                 int dataType = rs.getInt("DATA_TYPE");
                 String typeName = rs.getString("TYPE_NAME");
                 int precision = rs.getInt("COLUMN_SIZE");
                 int scale = rs.getInt("DECIMAL_DIGITS");
+                boolean notNull = DatabaseMetaData.columnNoNulls == rs.getInt("NULLABLE");
+
                 String fullType = mapSqlType(dataType, typeName, precision, scale);
                 int dotPos = fullType.lastIndexOf(".");
                 if (dotPos > -1 && !fullType.startsWith(CORE_PACKAGE_PREFIX)) imports.add(fullType);
@@ -184,32 +232,42 @@ public class GeneratorMojo extends AbstractMojo {
                 Pair<String, Boolean> javaCol = mappings.getMappedColumnName(tableName, dbColName);
                 String simpleType = fullType.substring(dotPos + 1);
 
+                int stringSize = "String".equals(simpleType)? precision : 0;
+
+                if (!dbColComment.isEmpty()) remarksAvailable = true;
+                if (notNull || stringSize > 0) validationsAvailable = true;
+
                 Map<String, Object> col = Map.of(
                         "javaName", javaCol.getLeft(),
                         "dbName", dbColName,
+                        "dbColComment", dbColComment,
+                        "notNull", notNull,
+                        "stringSize", stringSize,
                         "type", simpleType,
                         "hasCustomMapping", javaCol.getRight()
                 );
 
                 if (!hasCustomFieldMappings && javaCol.getRight()) hasCustomFieldMappings = true;
-
                 if (pkNames.contains(dbColName.toLowerCase())) pkCols.add(col);
                 else cols.add(col);
             }
         }
 
         // Prepare context for Handlebars template
-        Map<String, Object> context = Map.of(
-                "generationDate", LocalDateTime.now().format(DATE_TIME_ISO_FORMAT),
-                "packageName", packageName,
-                "className", javaClassName,
-                "dbTableName", tableName,
-                "hasCustomTableMapping", !tableName.equalsIgnoreCase(javaClassName),
-                "hasCustomFieldMappings",  hasCustomFieldMappings,
-                "pkColumns", pkCols,
-                "columns", cols,
-                "hasCompositePk", pkCols.size() > 1,
-                "imports", imports
+        Map<String, Object> context = Map.ofEntries(
+                entry("generationDate", LocalDateTime.now().format(DATE_TIME_ISO_FORMAT)),
+                entry("packageName", packageName),
+                entry("className", javaClassName),
+                entry("dbTableName", tableName),
+                entry("dbTableComment", tableComment),
+                entry("hasCustomTableMapping", !tableName.equalsIgnoreCase(javaClassName)),
+                entry("hasCustomFieldMappings",  hasCustomFieldMappings),
+                entry("remarksAvailable", useSwagger && remarksAvailable),
+                entry("validationAvailable", useJakartaValidation && validationsAvailable),
+                entry("pkColumns", pkCols),
+                entry("columns", cols),
+                entry("hasCompositePk", pkCols.size() > 1),
+                entry("imports", imports)
         );
 
         Path outDir = outputPath.resolve(packageName.replace(".", "/"));
@@ -325,5 +383,20 @@ public class GeneratorMojo extends AbstractMojo {
         } catch (IOException e) {
             throw new MojoExecutionException("Failed to load DB properties file: " + path, e);
         }
+    }
+
+
+    /**
+     * Cleans up a database remark by normalizing its whitespace.
+     * Consecutive whitespace characters are replaced with a single space,
+     * and leading/trailing whitespace is removed.
+     *
+     * @param input The input string to be cleaned. If null or blank, an empty string is returned.
+     * @return The cleaned and normalized string, or an empty string if the input is null or blank.
+     */
+    private static String cleanDBRemark(String input) {
+        if (input == null || input.isBlank()) return "";
+
+        return WHITESPACE_PATTERN.matcher(input).replaceAll(" ").trim();
     }
 }
