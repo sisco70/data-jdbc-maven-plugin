@@ -54,8 +54,9 @@ import static java.util.Map.entry;
 public class GeneratorMojo extends AbstractMojo {
     private static final Logger log = LoggerFactory.getLogger(GeneratorMojo.class);
 
+    private static final int MAX_VALIDATED_SIZE = 32768;
     private static final DateTimeFormatter DATE_TIME_ISO_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final String OFFSETDATETIME_CLASS = "java.time.OffsetDateTime";
+    private static final String OFFSET_DATETIME_CLASS = "java.time.OffsetDateTime";
     private static final String INSTANT_CLASS = "java.time.Instant";
 
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
@@ -147,7 +148,7 @@ public class GeneratorMojo extends AbstractMojo {
     public void execute() throws MojoExecutionException {
         log.info("Starting Spring Data JDBC Record Generation");
 
-        this.timestampTzClassName = useOffsetDateTime? OFFSETDATETIME_CLASS : INSTANT_CLASS;
+        this.timestampTzClassName = useOffsetDateTime? OFFSET_DATETIME_CLASS : INSTANT_CLASS;
         this.mappings = loadMappings(mappingsPath);
         Properties dbEnv = loadEnv(envPath);
         this.template = loadTemplate(templatesPath);
@@ -232,7 +233,7 @@ public class GeneratorMojo extends AbstractMojo {
                 Pair<String, Boolean> javaCol = mappings.getMappedColumnName(tableName, dbColName);
                 String simpleType = fullType.substring(dotPos + 1);
 
-                int stringSize = "String".equals(simpleType)? precision : 0;
+                int stringSize = ("String".equals(simpleType) && precision < MAX_VALIDATED_SIZE)? precision : 0;
 
                 if (!dbColComment.isEmpty()) remarksAvailable = true;
                 if (notNull || stringSize > 0) validationsAvailable = true;

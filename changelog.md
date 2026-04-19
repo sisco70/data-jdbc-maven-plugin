@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### 0.0.6
+- minor fixes
+- Don't use the @Size annotation when the size of a text field exceeds 32768 characters
+
 ### 0.0.5
 - new pom.xml configuration `useSwagger`: Include swagger annotations that use field and table descriptions (default):
 - new pom.xml configuration `useJakartaValidation`: Includes Jakarta Validation annotations that refer to fields and tables (default):
