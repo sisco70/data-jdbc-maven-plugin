@@ -5,7 +5,7 @@
 
     <groupId>net.guarnie</groupId>
     <artifactId>data-jdbc-maven-plugin</artifactId>
-    <version>0.0.6</version>
+    <version>0.1.0</version>
     <packaging>maven-plugin</packaging>
 
     <name>${project.artifactId}</name>

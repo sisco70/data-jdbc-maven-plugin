@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### 0.1.0
+- Changed mappings.yml to use the new naming convention.
+  See example inside README.md
+- Added support to custom annotations and imports
+- Added support to Jackson 3.x
+
 ### 0.0.6
 - minor fixes
 - Don't use the @Size annotation when the size of a text field exceeds 32768 characters

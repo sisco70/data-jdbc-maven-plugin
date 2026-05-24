@@ -21,7 +21,8 @@ import com.github.jknack.handlebars.Template;
 import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 import com.github.jknack.handlebars.io.FileTemplateLoader;
 import com.github.jknack.handlebars.io.TemplateLoader;
-import org.apache.commons.lang3.tuple.Pair;
+import net.guarnie.maven.plugin.data.jdbc.config.ColumnConfig;
+import net.guarnie.maven.plugin.data.jdbc.config.TableConfig;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -58,6 +59,9 @@ public class GeneratorMojo extends AbstractMojo {
     private static final DateTimeFormatter DATE_TIME_ISO_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final String OFFSET_DATETIME_CLASS = "java.time.OffsetDateTime";
     private static final String INSTANT_CLASS = "java.time.Instant";
+
+    private static final String JSON_NODE_JACKSON3_PACKAGE = "tools.jackson.databind.JsonNode";
+    private static final String JSON_NODE_JACKSON_PACKAGE = "com.fasterxml.jackson.databind.JsonNode";
 
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
     private static final Pattern PROTOCOL_PATTERN = Pattern.compile("jdbc:([^:]+):");
@@ -113,11 +117,17 @@ public class GeneratorMojo extends AbstractMojo {
     private boolean useJakartaValidation;
 
     /**
+     * Indicates whether Jackson 3 should be used for JSON processing.
+     * Default value: {@code true}
+     */
+    @Parameter(defaultValue = "true")
+    private boolean useJackson3;
+
+    /**
      * Path to a directory containing custom Handlebars templates.
      */
     @Parameter
     private Path templatesPath;
-
 
     /**
      * Loaded generator mappings configuration.
@@ -135,6 +145,13 @@ public class GeneratorMojo extends AbstractMojo {
     private String timestampTzClassName;
 
     /**
+     * Represents the package name for JSON Node handling.
+     * This variable is used to define the fully qualified package name
+     * for the JSON node processing classes.
+     */
+    private String jsonNodePackage = JSON_NODE_JACKSON3_PACKAGE;
+
+    /**
      * Default constructor
      */
     public GeneratorMojo() {
@@ -147,6 +164,8 @@ public class GeneratorMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException {
         log.info("Starting Spring Data JDBC Record Generation");
+
+        jsonNodePackage = useJackson3? JSON_NODE_JACKSON3_PACKAGE : JSON_NODE_JACKSON_PACKAGE;
 
         this.timestampTzClassName = useOffsetDateTime? OFFSET_DATETIME_CLASS : INSTANT_CLASS;
         this.mappings = loadMappings(mappingsPath);
@@ -190,16 +209,22 @@ public class GeneratorMojo extends AbstractMojo {
     }
 
     /**
-     * Generates a Java source file representing a Java record class that maps
-     * a database table from a specific schema.
-     * @param meta Database metadata
-     * @param tableName Table name
-     * @param tableComment Table comment
-     * @param schema Database schema
-     * @throws Exception If database access fails or file writing fails.
+     * Generates a Java record file based on the metadata and configuration of a database table.
+     * The generated file will be created in the specified output directory and rendered using
+     * a predefined Handlebars template.
+     *
+     * @param meta The metadata object used to query database schema information.
+     * @param tableName The name of the database table for which the record file is generated.
+     * @param tableComment The description or comment associated with the database table.
+     * @param catalog The catalog of the database in which the table resides (may be null).
+     * @param schema The schema of the database in which the table resides (may be null).
+     * @throws Exception If an error occurs while generating the record file, querying the database,
+     *                   or writing the output file.
      */
     private void generateRecordFile(DatabaseMetaData meta, String tableName, String tableComment, String catalog, String schema) throws Exception {
-        String javaClassName = mappings.getMappedTableName(tableName);
+        TableConfig tableConf = mappings.getTableConfig(tableName);
+        String javaClassName = tableConf.getName();
+
         log.info("Generating: {} -> {}", tableName, javaClassName);
 
         List<Map<String, Object>> cols = new ArrayList<>();
@@ -210,6 +235,10 @@ public class GeneratorMojo extends AbstractMojo {
         boolean validationsAvailable = false;
         boolean remarksAvailable = !tableComment.isEmpty();
 
+        // For each custom import string defined in the table's configuration, it adds that import to the imports collection
+        for (String imp : tableConf.getImports()) addToImports(imp, imports);
+
+        // It builds a collection of lowercase primary key column names for a given table, using JDBC's standard metadata API.
         try (ResultSet rs = meta.getPrimaryKeys(catalog, schema, tableName)) {
             while (rs.next()) {
                 pkNames.add(rs.getString("COLUMN_NAME").toLowerCase());
@@ -227,10 +256,9 @@ public class GeneratorMojo extends AbstractMojo {
                 boolean notNull = DatabaseMetaData.columnNoNulls == rs.getInt("NULLABLE");
 
                 String fullType = mapSqlType(dataType, typeName, precision, scale);
-                int dotPos = fullType.lastIndexOf(".");
-                if (dotPos > -1 && !fullType.startsWith(CORE_PACKAGE_PREFIX)) imports.add(fullType);
+                int dotPos = addToImports(fullType, imports);
 
-                Pair<String, Boolean> javaCol = mappings.getMappedColumnName(tableName, dbColName);
+                ColumnConfig colConf = tableConf.getColumnConfig(dbColName);
                 String simpleType = fullType.substring(dotPos + 1);
 
                 int stringSize = ("String".equals(simpleType) && precision < MAX_VALIDATED_SIZE)? precision : 0;
@@ -239,16 +267,17 @@ public class GeneratorMojo extends AbstractMojo {
                 if (notNull || stringSize > 0) validationsAvailable = true;
 
                 Map<String, Object> col = Map.of(
-                        "javaName", javaCol.getLeft(),
-                        "dbName", dbColName,
-                        "dbColComment", dbColComment,
-                        "notNull", notNull,
-                        "stringSize", stringSize,
-                        "type", simpleType,
-                        "hasCustomMapping", javaCol.getRight()
+                    "javaName", colConf.getName(),
+                    "dbName", dbColName,
+                    "dbColComment", dbColComment,
+                    "notNull", notNull,
+                    "annotations", colConf.getAnnotations(),
+                    "stringSize", stringSize,
+                    "type", simpleType,
+                    "hasCustomMapping", colConf.isCustomName()
                 );
 
-                if (!hasCustomFieldMappings && javaCol.getRight()) hasCustomFieldMappings = true;
+                if (!hasCustomFieldMappings && colConf.isCustomName()) hasCustomFieldMappings = true;
                 if (pkNames.contains(dbColName.toLowerCase())) pkCols.add(col);
                 else cols.add(col);
             }
@@ -274,6 +303,19 @@ public class GeneratorMojo extends AbstractMojo {
         Path outDir = outputPath.resolve(packageName.replace(".", "/"));
         Files.createDirectories(outDir);
         Files.writeString(outDir.resolve(javaClassName + ".java"), template.apply(context));
+    }
+
+    /**
+     * Adds the specified package name to the set of imports if it does not start with a predefined core package prefix.
+     *
+     * @param packageName The fully qualified name of the package to be considered for addition to the imports set.
+     * @param imports A set that holds the collection of package names to be imported.
+     * @return The position of the last dot character in the package name, or -1 if the package name does not contain a dot.
+     */
+    private int addToImports(String packageName, Set<String> imports) {
+        int dotPos = packageName.lastIndexOf(".");
+        if (dotPos > -1 && !packageName.startsWith(CORE_PACKAGE_PREFIX)) imports.add(packageName);
+        return dotPos;
     }
 
     /**
@@ -307,14 +349,14 @@ public class GeneratorMojo extends AbstractMojo {
 
             // SPECIAL TYPES (Postgres "OTHER", Oracle "RAW", etc.)
             case Types.OTHER, Types.ROWID -> switch (name) {
-                case "jsonb", "json" -> "com.fasterxml.jackson.databind.JsonNode";
+                case "jsonb", "json" -> jsonNodePackage;
                 case "uuid" -> "java.util.UUID";
                 default -> "java.lang.String";
             };
 
             // FALLBACK
             default -> {
-                if (name.contains("json")) yield "com.fasterxml.jackson.databind.JsonNode";
+                if (name.contains("json")) yield jsonNodePackage;
                 log.warn("Unsupported SQL type: {} (name: {}), falling back to Object", type, name);
                 yield "java.lang.Object";
             }
@@ -359,7 +401,7 @@ public class GeneratorMojo extends AbstractMojo {
         }
         else {
             log.info("No custom templates path specified. Falling back to default values.");
-            loader = new ClassPathTemplateLoader("/templates",  HBS_EXTENSION);
+            loader = new ClassPathTemplateLoader("/templates", HBS_EXTENSION);
         }
 
         try  {

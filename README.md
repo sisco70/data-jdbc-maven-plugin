@@ -20,7 +20,7 @@ A Maven plugin designed to generate Java Records for use with Spring Data JDBC, 
 <plugin>
     <groupId>net.guarnie</groupId>
     <artifactId>data-jdbc-maven-plugin</artifactId>
-    <version>0.0.5</version>
+    <version>0.1.0</version>
     <executions>
         <execution>
             <goals>
@@ -59,18 +59,23 @@ The following customizations can be added inside the `configuration` block:
 ```xml
 <outputPath>${project.basedir}/out/records</outputPath>
 ```
-- To map TIMESTAMP fields with TIMEZONE use OffsetDateTime instead of Instant (default):
+- To map TIMESTAMP fields with TIMEZONE use OffsetDateTime instead of Instant (default=true):
 ```xml
 <useOffsetDateTime>true</useOffsetDateTime>
 ```
-- Include swagger annotations that use field and table descriptions (default):
+- Include swagger annotations that use field and table descriptions (default=true):
 ```xml
 <useSwagger>true</useSwagger>
 ```
-- Includes Jakarta Validation annotations that refer to fields and tables (default):
+- Includes Jakarta Validation annotations that refer to fields and tables (default=true):
 ```xml
 <useJakartaValidation>true</useJakartaValidation>
 ```
+- Indicates whether Jackson 3 should be used for JSON processing (default=true):
+```xml
+<useJackson3>true</useJackson3>
+```
+
 #### Custom File Examples
 
 
@@ -85,18 +90,24 @@ jdbc.pass=*******
 ```
 
 
-Example mappings.yml file:
+Example of mappings.yml file:
 ```yaml
 filters:
   include: ["auth_.*"]
   exclude: ["flyway_schema_history", "temp_.*"]
 
-mappings:
-  tables:
-    auth_users: "AllUsers"
-  columns:
-    auth_users:
-      email: "emailAddress"
+tables:
+  role_scopes:
+    imports: ["com.fasterxml.jackson.annotation.JsonIgnore"]
+    columns:
+      role_desc:
+        annotations: ["@JsonIgnore"]
+  auth_users: 
+    name: "AllUsers"
+    columns:
+      email_addr: 
+        name: "emailAddress"
+        annotations: ["@JsonIgnore"]
 ```
 
 Both include and exclude are lists and support **regular expressions**.
