@@ -29,6 +29,7 @@ import static net.guarnie.maven.plugin.data.jdbc.GeneratorMappings.toPascalCase;
 public class TableConfig {
     private boolean customName = false;
     private String name;
+    private String subPackage;
 
     /**
      * Represents a set of fully qualified Java import statements associated with a table configuration.
@@ -138,5 +139,21 @@ public class TableConfig {
      */
     public void setImports(Set<String> imports) {
         this.imports = imports;
+    }
+
+    /**
+     * Retrieves the sub-package name associated with this table configuration.
+     * @return the sub-package name as a string.
+     */
+    public String getSubPackage() {
+        return subPackage;
+    }
+
+    /**
+     * Sets the sub-package name for the table configuration.
+     * @param subPackage the sub-package name to associate with this configuration
+     */
+    public void setSubPackage(String subPackage) {
+        this.subPackage = subPackage;
     }
 }

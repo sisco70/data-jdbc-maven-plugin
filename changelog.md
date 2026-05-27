@@ -1,5 +1,8 @@
 # CHANGELOG
 
+### 0.1.1
+- Added the ability to specify a subPackage for individual records, which appends to the main packageName configured in the Maven pom.xml.
+
 ### 0.1.0
 - Changed mappings.yml to use the new naming convention.
   See example inside README.md

@@ -9,7 +9,7 @@
 
 A Maven plugin designed to generate Java Records for use with Spring Data JDBC, reverse-engineered directly from a database schema.
 
-#### Example of usage within a pom.xml using default parameters
+### Example of usage within a pom.xml using default parameters
 
 - Environment variables: Database credentials loaded from a .env file located in the project root.
 
@@ -20,7 +20,7 @@ A Maven plugin designed to generate Java Records for use with Spring Data JDBC, 
 <plugin>
     <groupId>net.guarnie</groupId>
     <artifactId>data-jdbc-maven-plugin</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <executions>
         <execution>
             <goals>
@@ -75,8 +75,9 @@ The following customizations can be added inside the `configuration` block:
 ```xml
 <useJackson3>true</useJackson3>
 ```
+<br>
 
-#### Custom File Examples
+#### Custom Database Configuration File
 
 
 Example .env file for database access:
@@ -89,6 +90,19 @@ jdbc.user=master
 jdbc.pass=*******
 ```
 
+<br>
+
+#### Custom Mappings File
+
+By default, the plugin automatically processes database schemas to generate Java records and attributes following Spring Data JDBC naming conventions (converting tables to PascalCase and columns to camelCase, while stripping underscores).  
+Through the mapping.yml file, you can fully customize the generation pipeline with the following capabilities:  
+
+- **Regex-Based Table Filtering**: Supports fine-grained schema filtering using regular expressions.  
+  You can explicitly define include patterns to restrict generation to specific tables, and exclude patterns to bypass system, log, or temporary tables (e.g., preventing Flyway history or temporary backups from being processed).
+- **Granular Naming Overrides**: Explicitly define target names for specific records or attributes, bypassing default naming rules.
+- **Custom Package Routing**: Supplement the global packageName configured in the Maven plugin (pom.xml) by defining table-specific subPackage properties to logically organize your generated records.
+- **Annotation Injection**: Programmatically attach custom Java annotations to specific attributes.
+- **Dynamic Component Imports**: Declare custom Java imports at the record level to cleanly resolve third-party framework dependencies (such as Jackson or validation constraints).
 
 Example of mappings.yml file:
 ```yaml
@@ -98,6 +112,7 @@ filters:
 
 tables:
   role_scopes:
+    subPackage: "roles"
     imports: ["com.fasterxml.jackson.annotation.JsonIgnore"]
     columns:
       role_desc:
@@ -110,7 +125,4 @@ tables:
         annotations: ["@JsonIgnore"]
 ```
 
-Both include and exclude are lists and support **regular expressions**.
-- If `include` is not provided, all tables in the schema will be included by default.
-- If `exclude` is not provided, no tables will be excluded.
 

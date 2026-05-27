@@ -34,6 +34,7 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
+import javax.lang.model.SourceVersion;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -283,10 +284,19 @@ public class GeneratorMojo extends AbstractMojo {
             }
         }
 
+        String subPackage = tableConf.getSubPackage();
+        String fullPackageName = (subPackage == null || subPackage.isBlank())? packageName : packageName + "." + subPackage;
+
+        // Validates that the package name is syntactically correct
+        if (!SourceVersion.isName(fullPackageName) || !fullPackageName.equals(fullPackageName.toLowerCase())) {
+           log.error("Invalid package name: {}", fullPackageName);
+           throw new MojoExecutionException("Invalid package name: " + fullPackageName);
+        }
+
         // Prepare context for Handlebars template
         Map<String, Object> context = Map.ofEntries(
                 entry("generationDate", LocalDateTime.now().format(DATE_TIME_ISO_FORMAT)),
-                entry("packageName", packageName),
+                entry("packageName", fullPackageName),
                 entry("className", javaClassName),
                 entry("dbTableName", tableName),
                 entry("dbTableComment", tableComment),
@@ -300,7 +310,7 @@ public class GeneratorMojo extends AbstractMojo {
                 entry("imports", imports)
         );
 
-        Path outDir = outputPath.resolve(packageName.replace(".", "/"));
+        Path outDir = outputPath.resolve(fullPackageName.replace(".", "/"));
         Files.createDirectories(outDir);
         Files.writeString(outDir.resolve(javaClassName + ".java"), template.apply(context));
     }
