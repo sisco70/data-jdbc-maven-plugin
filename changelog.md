@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### 0.1.2
+- Minor fixes in default template table-record.hbs (table comment in record main javadoc)
+- Updated: handlebars version 4.5.3,  maven-plugin-api version 3.9.16
+
 ### 0.1.1
 - Added the ability to specify a subPackage for individual records, which appends to the main packageName configured in the Maven pom.xml.
 
