@@ -18,11 +18,14 @@ package net.guarnie.maven.plugin.data.jdbc;
 
 import com.github.jknack.handlebars.Handlebars;
 import com.github.jknack.handlebars.Template;
+import com.github.jknack.handlebars.helper.ConditionalHelpers;
 import com.github.jknack.handlebars.io.ClassPathTemplateLoader;
 import com.github.jknack.handlebars.io.FileTemplateLoader;
 import com.github.jknack.handlebars.io.TemplateLoader;
-import net.guarnie.maven.plugin.data.jdbc.config.ColumnConfig;
-import net.guarnie.maven.plugin.data.jdbc.config.TableConfig;
+import net.guarnie.maven.plugin.data.jdbc.configs.ColumnConfig;
+import net.guarnie.maven.plugin.data.jdbc.configs.TableConfig;
+import net.guarnie.maven.plugin.data.jdbc.types.AbstractTypeMapper;
+import net.guarnie.maven.plugin.data.jdbc.types.TypeMapperFactory;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -43,7 +46,6 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Map.entry;
@@ -65,15 +67,10 @@ public class GeneratorMojo extends AbstractMojo {
     private static final String JSON_NODE_JACKSON_PACKAGE = "com.fasterxml.jackson.databind.JsonNode";
 
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
-    private static final Pattern PROTOCOL_PATTERN = Pattern.compile("jdbc:([^:]+):");
 
     private static final String CORE_PACKAGE_PREFIX = "java.lang.";
     private static final String HBS_EXTENSION = ".hbs";
     private static final String TPL_TABLE_RECORD = "table-record";
-    private static final String JDBC_URL = "jdbc.url";
-    private static final String JDBC_USER = "jdbc.user";
-    private static final String JDBC_PASS = "jdbc.pass";
-    private static final String JDBC_SCHEMA = "jdbc.schema";
 
     /**
      * Path to the .env file containing database connection properties.
@@ -103,26 +100,26 @@ public class GeneratorMojo extends AbstractMojo {
      * Whether to use OffsetDateTime instead of Instant for timestamp with timezone fields.
      */
     @Parameter(defaultValue = "false")
-    private boolean useOffsetDateTime;
+    private boolean useOffsetDateTime = false;
 
     /**
      * Include swagger annotations that use field and table descriptions.
      */
     @Parameter(defaultValue = "true")
-    private boolean useSwagger;
+    private boolean useSwagger = true;
 
     /**
      * Includes Jakarta Validation annotations that refer to fields and tables.
      */
     @Parameter(defaultValue = "true")
-    private boolean useJakartaValidation;
+    private boolean useJakartaValidation = true;
 
     /**
      * Indicates whether Jackson 3 should be used for JSON processing.
      * Default value: {@code true}
      */
     @Parameter(defaultValue = "true")
-    private boolean useJackson3;
+    private boolean useJackson3 = true;
 
     /**
      * Path to a directory containing custom Handlebars templates.
@@ -145,12 +142,6 @@ public class GeneratorMojo extends AbstractMojo {
      */
     private String timestampTzClassName;
 
-    /**
-     * Represents the package name for JSON Node handling.
-     * This variable is used to define the fully qualified package name
-     * for the JSON node processing classes.
-     */
-    private String jsonNodePackage = JSON_NODE_JACKSON3_PACKAGE;
 
     /**
      * Default constructor
@@ -165,42 +156,23 @@ public class GeneratorMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException {
         log.info("Starting Spring Data JDBC Record Generation");
-
-        jsonNodePackage = useJackson3? JSON_NODE_JACKSON3_PACKAGE : JSON_NODE_JACKSON_PACKAGE;
-
-        this.timestampTzClassName = useOffsetDateTime? OFFSET_DATETIME_CLASS : INSTANT_CLASS;
-        this.mappings = loadMappings(mappingsPath);
+        template = loadTemplate(templatesPath);
+        mappings = loadMappings(mappingsPath);
         Properties dbEnv = loadEnv(envPath);
-        this.template = loadTemplate(templatesPath);
 
-        Properties connProps = new Properties();
-        connProps.setProperty("user", dbEnv.getProperty(JDBC_USER));
-        connProps.setProperty("password", dbEnv.getProperty(JDBC_PASS));
+        TypeMapperFactory.FactoryResult result = TypeMapperFactory.create(dbEnv,
+                useOffsetDateTime? OFFSET_DATETIME_CLASS : INSTANT_CLASS,
+                useJackson3? JSON_NODE_JACKSON3_PACKAGE : JSON_NODE_JACKSON_PACKAGE
+        );
 
-        String catalog = null;
-        String schemaPattern = dbEnv.getProperty(JDBC_SCHEMA);
-        String dbUrl = dbEnv.getProperty(JDBC_URL);
-
-        Matcher matcher = PROTOCOL_PATTERN.matcher(dbUrl);
-        String protocol = matcher.find()? matcher.group(1).toLowerCase() : "generic";
-
-        switch (protocol) {
-            case "oracle" -> connProps.setProperty("remarksReporting", "true");
-            case "mysql", "mariadb" -> {
-                catalog = schemaPattern;
-                schemaPattern = null;
-                connProps.setProperty("useInformationSchema", "true");
-            }
-        }
-
-        try (Connection conn = DriverManager.getConnection(dbUrl, connProps)) {
+        try (Connection conn = DriverManager.getConnection(result.dbUrl(), result.properties())) {
+            AbstractTypeMapper mapper = result.mapper();
             DatabaseMetaData meta = conn.getMetaData();
-
-            try (ResultSet rsTables = meta.getTables(catalog, schemaPattern, "%", new String[]{"TABLE"})) {
+            try (ResultSet rsTables = meta.getTables(mapper.getCatalog(), mapper.getSchemaPattern(), "%", new String[]{"TABLE"})) {
                 while (rsTables.next()) {
                     String tableName = rsTables.getString("TABLE_NAME");
                     String tableComment = cleanDBRemark(rsTables.getString("REMARKS"));
-                    if (mappings.shouldProcessTable(tableName)) generateRecordFile(meta, tableName, tableComment, catalog, schemaPattern);
+                    if (mappings.shouldProcessTable(tableName)) generateRecordFile(meta, tableName, tableComment, mapper);
                 }
             }
         } catch (Exception e) {
@@ -217,14 +189,15 @@ public class GeneratorMojo extends AbstractMojo {
      * @param meta The metadata object used to query database schema information.
      * @param tableName The name of the database table for which the record file is generated.
      * @param tableComment The description or comment associated with the database table.
-     * @param catalog The catalog of the database in which the table resides (may be null).
-     * @param schema The schema of the database in which the table resides (may be null).
+     * @param mapper The type mapper used to map database types to Java types.
      * @throws Exception If an error occurs while generating the record file, querying the database,
      *                   or writing the output file.
      */
-    private void generateRecordFile(DatabaseMetaData meta, String tableName, String tableComment, String catalog, String schema) throws Exception {
+    private void generateRecordFile(DatabaseMetaData meta, String tableName, String tableComment, AbstractTypeMapper mapper) throws Exception {
         TableConfig tableConf = mappings.getTableConfig(tableName);
         String javaClassName = tableConf.getName();
+        String catalog = mapper.getCatalog();
+        String schema = mapper.getSchemaPattern();
 
         log.info("Generating: {} -> {}", tableName, javaClassName);
 
@@ -256,13 +229,19 @@ public class GeneratorMojo extends AbstractMojo {
                 int scale = rs.getInt("DECIMAL_DIGITS");
                 boolean notNull = DatabaseMetaData.columnNoNulls == rs.getInt("NULLABLE");
 
-                String fullType = mapSqlType(dataType, typeName, precision, scale);
-                int dotPos = addToImports(fullType, imports);
-
+                // Column-specific configurations retrieved from mappings
                 ColumnConfig colConf = tableConf.getColumnConfig(dbColName);
-                String simpleType = fullType.substring(dotPos + 1);
+                String type = colConf.getType();
 
-                int stringSize = ("String".equals(simpleType) && precision < MAX_VALIDATED_SIZE)? precision : 0;
+                // If no explicit Java type is set, the internal engine determines the fully qualified package name
+                // of the Java object that best matches the SQL type (based on the underlying DB).
+                if (type == null) {
+                    String packageName = mapper.mapSqlType(dataType, typeName, precision, scale);
+                    int dotPos = addToImports(packageName, imports);
+                    type = packageName.substring(dotPos + 1);
+                }
+
+                int stringSize = ("String".equals(type) && precision < MAX_VALIDATED_SIZE)? precision : 0;
 
                 if (!dbColComment.isEmpty()) remarksAvailable = true;
                 if (notNull || stringSize > 0) validationsAvailable = true;
@@ -274,7 +253,7 @@ public class GeneratorMojo extends AbstractMojo {
                     "notNull", notNull,
                     "annotations", colConf.getAnnotations(),
                     "stringSize", stringSize,
-                    "type", simpleType,
+                    "type", type,
                     "hasCustomMapping", colConf.isCustomName()
                 );
 
@@ -300,7 +279,7 @@ public class GeneratorMojo extends AbstractMojo {
                 entry("className", javaClassName),
                 entry("dbTableName", tableName),
                 entry("dbTableComment", tableComment),
-                entry("hasCustomTableMapping", !tableName.equalsIgnoreCase(javaClassName)),
+                entry("hasCustomTableMapping", tableConf.isCustomName()),
                 entry("hasCustomFieldMappings",  hasCustomFieldMappings),
                 entry("remarksAvailable", useSwagger && remarksAvailable),
                 entry("validationAvailable", useJakartaValidation && validationsAvailable),
@@ -324,53 +303,11 @@ public class GeneratorMojo extends AbstractMojo {
      */
     private int addToImports(String packageName, Set<String> imports) {
         int dotPos = packageName.lastIndexOf(".");
-        if (dotPos > -1 && !packageName.startsWith(CORE_PACKAGE_PREFIX)) imports.add(packageName);
+        if (dotPos > -1 && !packageName.startsWith(CORE_PACKAGE_PREFIX)) {
+            int idx = packageName.indexOf('<');
+            imports.add(packageName.substring(0, idx < 0? packageName.length() : idx));
+        }
         return dotPos;
-    }
-
-    /**
-     * Returns the Java type that maps the database field.
-     * @param type JDBC type code
-     * @param typeName Field type name
-     * @param precision Field precision
-     * @param scale Field scale
-     * @return Fully qualified Java class name as a String
-     */
-    private String mapSqlType(int type, String typeName, int precision, int scale) {
-        String name = (typeName == null) ? "" : typeName.toLowerCase();
-
-        return switch (type) {
-            case Types.INTEGER, Types.SMALLINT, Types.TINYINT -> "java.lang.Integer";
-            case Types.BIGINT -> "java.lang.Long";
-
-            case Types.DECIMAL, Types.NUMERIC -> (scale <= 0)?  // If scale is 0 or -127 (Oracle), it's an integer
-                    ((precision > 0 && precision < 10)? "java.lang.Integer" : "java.lang.Long") : "java.math.BigDecimal";
-
-            case Types.FLOAT, Types.REAL, Types.DOUBLE -> "java.lang.Double";
-            case Types.VARCHAR, Types.CHAR, Types.LONGVARCHAR, Types.CLOB, Types.NVARCHAR, Types.NCHAR -> "java.lang.String";
-            case Types.BOOLEAN, Types.BIT -> "java.lang.Boolean";
-
-            // DATE AND TIME: SQL Server (-155) and Postgres support
-            case -155, Types.TIMESTAMP_WITH_TIMEZONE -> timestampTzClassName;
-            case Types.TIMESTAMP -> name.contains("tz") || name.contains("offset")? timestampTzClassName : "java.time.LocalDateTime";
-            case Types.DATE -> "java.time.LocalDate";
-            case Types.TIME -> "java.time.LocalTime";
-            case Types.BINARY, Types.VARBINARY, Types.LONGVARBINARY, Types.BLOB -> "byte[]";
-
-            // SPECIAL TYPES (Postgres "OTHER", Oracle "RAW", etc.)
-            case Types.OTHER, Types.ROWID -> switch (name) {
-                case "jsonb", "json" -> jsonNodePackage;
-                case "uuid" -> "java.util.UUID";
-                default -> "java.lang.String";
-            };
-
-            // FALLBACK
-            default -> {
-                if (name.contains("json")) yield jsonNodePackage;
-                log.warn("Unsupported SQL type: {} (name: {}), falling back to Object", type, name);
-                yield "java.lang.Object";
-            }
-        };
     }
 
     /**
@@ -397,13 +334,14 @@ public class GeneratorMojo extends AbstractMojo {
     }
 
     /**
-     * Loads the Handlebars template.
+     * Loads the Handlebars template (supports conditional helpers).
      * @param path Optional path to a folder containing custom templates.
      * @return Compiled Handlebars Template.
      * @throws MojoExecutionException If the template cannot be loaded or compiled.
      */
     private Template loadTemplate(Path path) throws MojoExecutionException {
         TemplateLoader loader;
+
         if (path != null) {
             if (!Files.exists(path)) throw new MojoExecutionException("Templates path not exists: " + path);
             else loader = new FileTemplateLoader(path.toFile(), HBS_EXTENSION);
@@ -416,6 +354,7 @@ public class GeneratorMojo extends AbstractMojo {
 
         try  {
             Handlebars handlebars = new Handlebars(loader);
+            handlebars.registerHelpers(ConditionalHelpers.class);
             return handlebars.compile(TPL_TABLE_RECORD);
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to parse record template: " + TPL_TABLE_RECORD, e);
@@ -451,5 +390,43 @@ public class GeneratorMojo extends AbstractMojo {
         if (input == null || input.isBlank()) return "";
 
         return WHITESPACE_PATTERN.matcher(input).replaceAll(" ").trim();
+    }
+
+    // Setters
+
+    public void setEnvPath(Path envPath) {
+        this.envPath = envPath;
+    }
+
+    public void setMappingsPath(Path mappingsPath) {
+        this.mappingsPath = mappingsPath;
+    }
+
+    public void setPackageName(String packageName) {
+        this.packageName = packageName;
+    }
+
+    public void setOutputPath(Path outputPath) {
+        this.outputPath = outputPath;
+    }
+
+    public void setUseOffsetDateTime(boolean useOffsetDateTime) {
+        this.useOffsetDateTime = useOffsetDateTime;
+    }
+
+    public void setUseSwagger(boolean useSwagger) {
+        this.useSwagger = useSwagger;
+    }
+
+    public void setUseJakartaValidation(boolean useJakartaValidation) {
+        this.useJakartaValidation = useJakartaValidation;
+    }
+
+    public void setUseJackson3(boolean useJackson3) {
+        this.useJackson3 = useJackson3;
+    }
+
+    public void setTemplatesPath(Path templatesPath) {
+        this.templatesPath = templatesPath;
     }
 }

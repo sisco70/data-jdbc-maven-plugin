@@ -1,5 +1,6 @@
 package net.guarnie.maven.plugin.data.jdbc;
 
+import org.checkerframework.checker.tainting.qual.Untainted;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.jdbc.core.DataClassRowMapper;
@@ -71,7 +72,7 @@ public class QueryHelper {
             Path outputDir,
             String packageName,
             String className,
-            String sql,
+            @Untainted String sql,
             List<Object> params,
             TableTestExecutor testExecutor
     ) throws Exception {

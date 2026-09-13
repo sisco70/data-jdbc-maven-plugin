@@ -16,8 +16,8 @@
 package net.guarnie.maven.plugin.data.jdbc;
 
 
-import net.guarnie.maven.plugin.data.jdbc.config.FiltersConfig;
-import net.guarnie.maven.plugin.data.jdbc.config.TableConfig;
+import net.guarnie.maven.plugin.data.jdbc.configs.FiltersConfig;
+import net.guarnie.maven.plugin.data.jdbc.configs.TableConfig;
 
 import java.util.HashMap;
 import java.util.Map;

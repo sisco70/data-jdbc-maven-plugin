@@ -1,5 +1,15 @@
 # CHANGELOG
 
+### 0.2.0
+- Fixed `useJakartaValidation` flag behavior, which now disables the use of Jakarta Validation annotations.
+- Revision of the management of mapping SQL types to Java types. Now more accurate and specialized for DB:
+  - Array data type
+  - Geospatial data types support for PostgreSQL and MySql/MariaDB
+- Java type customization: Overrides the internal engine's Java type for an attribute (e.g., to map a custom Enum)
+- Added a preliminary version of integration tests
+- Updated: handlebars version 4.5.4
+- Updated: snakeyaml version 2.7
+
 ### 0.1.2
 - Minor fixes in default template table-record.hbs (table comment in record main javadoc)
 - Updated: handlebars version 4.5.3,  maven-plugin-api version 3.9.16

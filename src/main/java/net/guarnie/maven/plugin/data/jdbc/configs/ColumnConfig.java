@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package net.guarnie.maven.plugin.data.jdbc.config;
+package net.guarnie.maven.plugin.data.jdbc.configs;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +22,7 @@ import static net.guarnie.maven.plugin.data.jdbc.GeneratorMappings.toCamelCase;
 public class ColumnConfig {
     private boolean customName = false;
     private String name;
+    private String type;
     private List<String> annotations;
 
     public ColumnConfig() {
@@ -88,5 +89,21 @@ public class ColumnConfig {
      */
     public boolean isCustomName() {
         return customName;
+    }
+
+    /**
+     * Retrieves the type associated with the column configuration.
+     * @return the type of the column configuration as a string.
+     */
+    public String getType() {
+        return type;
+    }
+
+    /**
+     * Sets the type associated with the column configuration.
+     * @param type the type of the column configuration as a string.
+     */
+    public void setType(String type) {
+        this.type = type;
     }
 }
