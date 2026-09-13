@@ -185,8 +185,10 @@ Through the mapping.yml file, you can fully customize the generation pipeline wi
 - **Dynamic Component Imports**: Declare custom Java imports at the record level to cleanly resolve third-party framework dependencies or internal custom classes.
 - **Annotation Injection**: Programmatically attach custom Java annotations to specific attributes.
 - **Java type customization**: Overrides the internal engine's Java type for an attribute (e.g., to map a custom Enum)
-- 
-Example of mappings.yml file:
+
+<br>
+
+#### Example of mappings.yml file:
 ```yaml
 filters:
   include: ["auth_.*"]
