@@ -78,6 +78,10 @@ public record AuthUsers(
       String username,
 
       @NotNull
+      @Schema(description = "User type")
+      UserTypeEnum usrType,
+
+      @NotNull
       @Schema(description = "User creation date")
       Instant createdAt,
 
