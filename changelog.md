@@ -2,9 +2,9 @@
 
 ### 0.2.0
 - Fixed `useJakartaValidation` flag behavior, which now disables the use of Jakarta Validation annotations.
-- Revision of the management of mapping SQL types to Java types. Now more accurate and specialized for DB:
-  - Array data type
-  - Geospatial data types support for PostgreSQL and MySql/MariaDB
+- Revision of SQL-to-Java type mapping logic. Now more accurate and specialized per database:
+  - Added support for Array data types in PostgreSQL and Oracle (basic)
+  - Added support for Geospatial data types in PostgreSQL and MySQL/MariaDB
 - Java type customization: Overrides the internal engine's Java type for an attribute (e.g., to map a custom Enum)
 - Added a preliminary version of integration tests
 - Updated: handlebars version 4.5.4
