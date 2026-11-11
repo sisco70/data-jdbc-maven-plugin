@@ -156,6 +156,11 @@ The following customizations can be added inside the `configuration` block:
 ```xml
 <useJackson3>true</useJackson3>
 ```
+- Indicates whether to force the use of the @Table annotation even in the absence of a specific mapping with name (default=false):
+```xml
+<forceTableAnnotation>true</forceTableAnnotation>
+```
+
 <br>
 
 ### Database Configuration File

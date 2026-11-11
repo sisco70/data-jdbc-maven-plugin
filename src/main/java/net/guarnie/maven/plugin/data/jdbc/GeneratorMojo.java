@@ -122,6 +122,13 @@ public class GeneratorMojo extends AbstractMojo {
     private boolean useJackson3 = true;
 
     /**
+     * Indicates whether to force the use of the @Table annotation even in the absence of a specific mapping with name
+     * Default value: {@code false}
+     */
+    @Parameter(defaultValue = "false")
+    private boolean forceTableAnnotation;
+
+    /**
      * Path to a directory containing custom Handlebars templates.
      */
     @Parameter
@@ -279,7 +286,7 @@ public class GeneratorMojo extends AbstractMojo {
                 entry("className", javaClassName),
                 entry("dbTableName", tableName),
                 entry("dbTableComment", tableComment),
-                entry("hasCustomTableMapping", tableConf.isCustomName()),
+                entry("hasCustomTableMapping", forceTableAnnotation || tableConf.isCustomName()),
                 entry("hasCustomFieldMappings",  hasCustomFieldMappings),
                 entry("remarksAvailable", useSwagger && remarksAvailable),
                 entry("validationAvailable", useJakartaValidation && validationsAvailable),
