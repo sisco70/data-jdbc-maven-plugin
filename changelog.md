@@ -1,5 +1,8 @@
 # CHANGELOG
 
+### 0.2.1
+- Added a new parameter `forceTableAnnotation`, which specifies whether to force the use of the @Table annotation even in the absence of a specific named mapping (default=false).
+
 ### 0.2.0
 - Fixed `useJakartaValidation` flag behavior, which now disables the use of Jakarta Validation annotations.
 - Revision of SQL-to-Java type mapping logic. Now more accurate and specialized per database:
