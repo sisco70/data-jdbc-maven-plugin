@@ -188,6 +188,10 @@ Through the mapping.yml file, you can fully customize the generation pipeline wi
 - **Granular Naming Overrides**: Explicitly define target names for specific records or attributes, bypassing default naming rules.
 - **Custom Package Routing**: Supplement the global packageName configured in the Maven plugin (pom.xml) by defining table-specific subPackage properties to logically organize your generated records.
 - **Dynamic Component Imports**: Declare custom Java imports at the record level to cleanly resolve third-party framework dependencies or internal custom classes.
+- **Global Import Registry**: Declare once, in the top-level `importRegistry` list, the fully qualified names of the classes
+  (enums, annotations...) you use in many records. An import is emitted only in the records that actually reference the
+  class by simple name, in a column `type` or inside an `annotations` entry, so there are no unused imports.
+  Table-level `imports` remain available for specific cases and win over a registry entry with the same simple name.
 - **Annotation Injection**: Programmatically attach custom Java annotations to specific attributes.
 - **Java type customization**: Overrides the internal engine's Java type for an attribute (e.g., to map a custom Enum)
 
@@ -199,20 +203,43 @@ filters:
   include: ["auth_.*"]
   exclude: ["flyway_schema_history", "temp_.*"]
 
+# Imported only by the records that use these classes (simple names must be unique)
+importRegistry:
+  - "com.fasterxml.jackson.annotation.JsonIgnore"
+  - "net.guarnie.example.enums.UserTypeEnum"
+
 tables:
   role_scopes:
     subPackage: "roles"
-    imports: ["com.fasterxml.jackson.annotation.JsonIgnore", "net.guarnie.example.enums.UserTypeEnum"]
     columns:
       role_desc:
         annotations: ["@JsonIgnore"]
   auth_users: 
     name: "AllUsers"
+    # Table-level imports are still supported for one-off cases
+    imports: ["net.guarnie.example.Audited"]
     columns:
       email_addr: 
         name: "emailAddress"
       user_type:
         type: "UserTypeEnum"
 ```
+
+How the registry is resolved:
+- Only simple names are matched: `@JsonIgnore`, `UserTypeEnum`, `@References(Sede.class)`.
+  Qualified names (`@a.b.Zone`) and the content of string literals are ignored.
+- If a table-level import has the same simple name as a registry entry, the table-level import wins.
+- Two registry entries with the same simple name, or an entry that is not fully qualified, make the build fail.
+
+### Building and testing
+
+Integration tests (a real PostgreSQL started with Testcontainers, Docker required) live in `src/it`
+and run only with the `integration` profile, which also brings all the test dependencies:
+
+```shell
+mvn -Pintegration verify
+```
+
+Without the profile the build ignores `src/it` and does not resolve any test dependency.
 
 

@@ -1,21 +1,20 @@
 package net.guarnie.maven.plugin.data.jdbc;
 
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.JdbcDatabaseContainer;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-@Testcontainers
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+/**
+ * Common base of the integration tests: provides the database connection file and a clean output
+ * folder for every test. The database itself (a singleton container) is provided by the subclasses.
+ */
 public abstract class AbstractIntegrationTest {
     private static final String GENERATED_SOURCES = "generated-sources";
+    private static final String MAPPINGS_FILE = "mappings.yaml";
     protected static final String GENERATED_PACKAGE_NAME = "net.guarnie.generated";
     protected Path tempDir;
     protected Path envFile;
@@ -23,22 +22,8 @@ public abstract class AbstractIntegrationTest {
 
     protected abstract JdbcDatabaseContainer<?> getContainer();
 
-    protected abstract String getDbVendor();
-
     protected String getSchemaName() {
         return "public";
-    }
-
-    @BeforeAll
-    void migrateDatabase() {
-        JdbcDatabaseContainer<?> container = getContainer();
-        String vendorLocation = "classpath:db/migration/" + getDbVendor();
-
-        Flyway.configure()
-                .dataSource(container.getJdbcUrl(), container.getUsername(), container.getPassword())
-                .locations(vendorLocation)
-                .load()
-                .migrate();
     }
 
     private Path createEnvFile(Path tempDir) throws Exception {
@@ -60,6 +45,25 @@ public abstract class AbstractIntegrationTest {
         this.tempDir = tempDir;
         envFile = createEnvFile(tempDir);
         outputDir = tempDir.resolve(GENERATED_SOURCES);
+    }
+
+    /**
+     * Runs the generator on the test database, using the given mappings.yml content.
+     *
+     * @param mappingsYaml content of the mappings file
+     * @throws Exception if the generation fails
+     */
+    protected void executeMojo(String mappingsYaml) throws Exception {
+        Path mappingFile = tempDir.resolve(MAPPINGS_FILE);
+        Files.writeString(mappingFile, mappingsYaml);
+
+        GeneratorMojo mojo = new GeneratorMojo();
+        mojo.setEnvPath(envFile);
+        mojo.setPackageName(GENERATED_PACKAGE_NAME);
+        mojo.setOutputPath(outputDir);
+        mojo.setMappingsPath(mappingFile);
+
+        mojo.execute();
     }
 
     protected void executeRecordQueryTest(

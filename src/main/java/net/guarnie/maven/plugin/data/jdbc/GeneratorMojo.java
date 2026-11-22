@@ -248,6 +248,10 @@ public class GeneratorMojo extends AbstractMojo {
                     type = packageName.substring(dotPos + 1);
                 }
 
+                // Classes declared in the global importRegistry are imported only when this column actually uses them
+                if (colConf.getType() != null) addRegistryImports(colConf.getType(), imports);
+                for (String annotation : colConf.getAnnotations()) addRegistryImports(annotation, imports);
+
                 int stringSize = ("String".equals(type) && precision < MAX_VALIDATED_SIZE)? precision : 0;
 
                 if (!dbColComment.isEmpty()) remarksAvailable = true;
@@ -299,6 +303,31 @@ public class GeneratorMojo extends AbstractMojo {
         Path outDir = outputPath.resolve(fullPackageName.replace(".", "/"));
         Files.createDirectories(outDir);
         Files.writeString(outDir.resolve(javaClassName + ".java"), template.apply(context));
+    }
+
+    /**
+     * Adds to the imports the classes of the global {@code importRegistry} referenced by a type or an annotation.
+     * An import already present in the set (e.g. declared at table level) with the same simple name always wins:
+     * the registry entry is skipped and a warning is logged when the two classes differ.
+     *
+     * @param expression The column type or annotation to inspect.
+     * @param imports The set of imports of the record being generated.
+     */
+    private void addRegistryImports(String expression, Set<String> imports) {
+        for (String fqcn : mappings.findRegistryImports(expression)) {
+            String simpleName = fqcn.substring(fqcn.lastIndexOf('.') + 1);
+            String existing = null;
+            for (String imp : imports) {
+                if (imp.endsWith("." + simpleName)) {
+                    existing = imp;
+                    break;
+                }
+            }
+
+            if (existing == null) imports.add(fqcn);
+            else if (!existing.equals(fqcn))
+                log.warn("importRegistry entry {} skipped: {} is already imported with the same simple name", fqcn, existing);
+        }
     }
 
     /**

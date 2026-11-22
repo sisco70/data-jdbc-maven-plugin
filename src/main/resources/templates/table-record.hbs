@@ -38,7 +38,7 @@ public record {{className}}(
     {{#if hasCompositePk}}@Id {{className}}Id id{{else~}}
     {{#each pkColumns}}{{#if (and validationAvailable notNull)}}@NotNull
     {{/if~}}
-    {{#each annotations}}{{this}}
+    {{#each annotations}}{{{this}}}
     {{/each~}}
     {{#if (and validationAvailable stringSize)}}@Size(min = 1, max = {{stringSize}}, message = "{{javaName}} must be between 1 and {{stringSize}} characters")
     {{/if~}}
@@ -51,7 +51,7 @@ public record {{className}}(
 {{~#each columns}}
     {{#if (and validationAvailable notNull)}}@NotNull
     {{/if~}}
-    {{#each annotations}}{{this}}
+    {{#each annotations}}{{{this}}}
     {{/each~}}
     {{#if (and validationAvailable stringSize)}}@Size(min = 1, max = {{stringSize}}, message = "{{javaName}} must be between 1 and {{stringSize}} characters")
     {{/if~}}
@@ -66,7 +66,7 @@ public record {{className}}(
     {{~#each pkColumns}}
         {{#if (and validationAvailable notNull)}}@NotNull
         {{/if~}}
-        {{#each annotations}}{{this}}
+        {{#each annotations}}{{{this}}}
         {{/each~}}
         {{#if (and validationAvailable stringSize)}}@Size(min = 1, max = {{stringSize}}, message = "{{javaName}} must be between 1 and {{stringSize}} characters")
         {{/if~}}

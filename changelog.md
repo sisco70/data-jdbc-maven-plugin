@@ -1,5 +1,16 @@
 # CHANGELOG
 
+### 0.3.0
+- Added the global `importRegistry` list to mappings.yml: fully qualified classes (enums, annotations...) declared once and imported only
+  in the records that reference them by simple name in a column `type` or in an annotation. Table-level `imports` still work and take precedence
+  on a clash of simple names.
+- Integration tests moved to `src/it` and run only with the `integration` profile (`mvn -Pintegration verify`), which now holds all
+  the test dependencies; they share a single PostgreSQL container.
+- Fixed the default template table-record.hbs: annotations are no longer HTML-escaped (e.g. `@Marker(note = "x")` was generated with `&#x3D;` and `&quot;`).
+- Updated: handlebars version 4.5.8
+- Updated build and test tooling: maven-plugin-tools 3.16.0, maven-compiler-plugin 3.16.0, maven-failsafe-plugin 3.6.1, build-helper-maven-plugin 3.7.0 (requires Maven 3.9+ to run the integration tests),
+  flyway 13.13.0, postgresql driver 42.7.14, swagger-annotations 2.2.56, jackson-databind 3.3.0
+
 ### 0.2.1
 - Added a new parameter `forceTableAnnotation`, which specifies whether to force the use of the @Table annotation even in the absence of a specific named mapping (default=false).
 

@@ -2,7 +2,6 @@ package net.guarnie.maven.plugin.data.jdbc.postgres;
 
 import net.guarnie.maven.plugin.data.jdbc.CompileHelper;
 import net.guarnie.maven.plugin.data.jdbc.QueryHelper;
-import net.guarnie.maven.plugin.data.jdbc.GeneratorMojo;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,28 +15,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class GeneratorMojoIT extends AbstractPostgresIntegrationTest {
     private static final Logger log = LoggerFactory.getLogger(GeneratorMojoIT.class);
-    private static final DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX");
+    private static final DateTimeFormatter dtFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssX");
     private static final String TABLE_NAME_1 = "FirstTable";
     private static final String TABLE_NAME_2 = "SecondTable";
     private static final String TABLE_NAME_3 = "TableThree";
     private static final String TABLE_NAME_4 = "TableFour";
 
     private static final String GENERATED_DIR = GENERATED_PACKAGE_NAME.replace('.', '/');
-    private static final String MAPPINGS_FILE = "mappings.yaml";
 
-
-    private void executeMojo(String mappingsYaml) throws Exception {
-        Path mappingFile = tempDir.resolve(MAPPINGS_FILE);
-        Files.writeString(mappingFile, mappingsYaml);
-
-        GeneratorMojo mojo = new GeneratorMojo();
-        mojo.setEnvPath(envFile);
-        mojo.setPackageName(GENERATED_PACKAGE_NAME);
-        mojo.setOutputPath(outputDir);
-        mojo.setMappingsPath(mappingFile);
-
-        mojo.execute();
-    }
 
     @Test
     void testRecordFiles() throws Exception {
@@ -117,7 +102,7 @@ class GeneratorMojoIT extends AbstractPostgresIntegrationTest {
                     Object record = results.get(0);
                     OffsetDateTime offsetDateTime = OffsetDateTime.parse("9999-12-31 01:00:00+01", dtFormatter);
 
-                    assertEquals(offsetDateTime.toInstant(), QueryHelper.get(record, "date_end"));
+                    assertEquals(offsetDateTime.toInstant(), QueryHelper.get(record, "dateEnd"));
                 }
         );
 
